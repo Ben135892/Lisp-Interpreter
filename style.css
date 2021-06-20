@@ -1,0 +1,21 @@
+div {
+    margin: auto;
+    width: 50%;
+    text-align: center;
+    font-family: sans-serif;
+}
+
+div textarea {
+    padding: 5px;
+    font-size: 20px;
+    resize: none;
+    border: 1px solid black;
+}
+
+div button {
+    display: block;
+    margin: 30px auto;
+    width: 20%;
+    padding: 5px;
+    border: 1px solid black;
+}
