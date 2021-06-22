@@ -1,15 +1,16 @@
 # Lisp-Interpreter
-Program that parses and interprets LISP code. Example input code:
+Write LISP code in the input box and click the evaluate button to run.
+Example input code:
 ```
-(define x 5)
 (define (factorial n) 
   (if (= n 1) 
     n 
     (* n (factorial (- n 1)))))
+(define x 5)
 (factorial x)
 ```
-This code will output 120.
-Can also write code to output the nth fibonacci number like so:
+which will will output 120.
+Can also write code to recursivly calculate the nth fibonacci number like so:
 ```
 (define (fib n) 
 (cond ((= n 0) 0)
