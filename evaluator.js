@@ -64,21 +64,21 @@ function isTrue(exp) { return exp != false; }
 function isFalse(exp) { return exp == false; }
 function isIf(exp) { return isTaggedList(exp, 'if'); }
 function ifPredicate(exp) { 
-    if (exp[1])
+    if (exp[1] != undefined)
         return exp[1];
     throw new Error('ERROR: PREDICATE missing in IF - ' + outputExp(exp));
 }
 function ifConsequent(exp) { 
-    if (exp[2])
+    if (exp[2] != undefined)
         return exp[2];
     throw new Error('ERROR: CONSEQUENT missing in IF - ' + outputExp(exp));
- }
+}
 function ifAlternative(exp) { 
-    if (exp[3])
+    if (exp[3] != undefined)
         return exp[3];
     return 'false'; 
 }
-function makeIf(predicate, consequent, alternative) { return ['if', predicate, consequent, alternative ]; }
+function makeIf(predicate, consequent, alternative) { return ['if', predicate, consequent, alternative]; }
 
 function evalIf(exp, env) {
     const predicate = eval(ifPredicate(exp), env);
@@ -92,12 +92,12 @@ function isAssignment(exp) {
     return isTaggedList(exp, 'set!');
 }
 function assignmentVariable(exp) { 
-    if (exp[1])
+    if (exp[1] != undefined)
         return exp[1];
     throw new Error('ERROR: VARIABLE NAME missing in SET! - ' + outputExp(exp));
 }
 function assignmentValue(exp) { 
-    if (exp[2])
+    if (exp[2] != undefined)
         return exp[2];
     throw new Error('ERROR: VALUE missing in SET! - ' + outputExp(exp));
 }
@@ -119,14 +119,14 @@ function definitionVariable(exp) {
         variable = exp[1][0];
     else 
         variable = exp[1];
-    if (variable)
+    if (variable != undefined)
         return variable;
     throw new Error('ERROR: VARIABLE NAME missing in DEFINE - ' + outputExp(exp));
 }
 
 function definitionValue(exp) {
     if (!Array.isArray(exp[1])) {
-        if (exp[2])
+        if (exp[2] != undefined)
             return exp[2];
         throw new Error('ERROR: VALUE missing in DEFINE - ' + outputExp(exp));
     }
@@ -180,7 +180,7 @@ function makeBegin(seq) {
 function isCond(exp) { return isTaggedList(exp, 'cond'); }
 function condClauses(exp) { return exp.slice(1); }
 function condPredicate(clause) { 
-    if (clause[0]) 
+    if (clause[0] != undefined) 
         return clause[0];
     throw new Error('ERROR: PREDICATE missing in COND->IF - ' + outputExp(clause));
 }
@@ -215,7 +215,7 @@ function expandClauses(clauses) {
 // lambda expressions
 function isLambda(exp) { return isTaggedList(exp, 'lambda'); }
 function lambdaParameters(exp) { 
-    if (exp[1])
+    if (exp[1] != undefined)
         return exp[1];
     throw new Error('ERROR: PARAMETERS missing in LAMBDA - ' + outputExp(exp));
 }
@@ -237,7 +237,7 @@ function isApplication(exp) {
     return Array.isArray(exp);
 }
 function operator(exp) { 
-    if (exp[0]) 
+    if (exp[0] != undefined) 
         return exp[0];
     throw new Error('ERROR: OPERATOR missing in APPLY - ' + outputExp(exp));
 }
@@ -340,14 +340,3 @@ function primitiveProcedureObjects() { return primitiveProcedures.map(x => ['pri
 function applyPrimitiveProcedure(proc, args) { return primitiveImplementation(proc)(args); }
 
 const globalEnv = setupEnvironment();
-try {   
-    //eval( ['define', 'factorial', ['lambda', ['x'], ['if', ['=', 'x', 1], 'x', ['*', 'x', ['factorial', ['-', 'x', 1]]]] ]] , globalEnv);
-    //console.log(eval( ['define', ['factorial', 'x'], ['if', ['=', 'x', 1], 1, ['*', 'x', ['factorial', ['-', 'x', 1]]] ] ] , globalEnv));
-    //eval(['define', 'x', 2], globalEnv);
-    // (define y 2), (define (factorial x) (if (= x 1) 1 (...)))
-    //console.log(eval('x', globalEnv));
-    //console.log(eval(['factorial', 8], globalEnv));
-} 
-catch(err) {
-    console.log(err);
-}
