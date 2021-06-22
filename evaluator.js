@@ -1,3 +1,16 @@
+function outputExp(exp) {
+    if (!Array.isArray(exp))
+        return exp;
+    let output = '(';
+    for (let i = 0; i < exp.length; i++) {
+        output += outputExp(exp[i]) + ' ';
+    }
+    if (exp.length > 0)
+        output = output.slice(0, -1);
+    output += ')';
+    return output;
+}
+
 function eval(exp, env) {
     if (isSelfEvaluating(exp))
         return value(exp);
@@ -13,9 +26,13 @@ function eval(exp, env) {
         return evalIf(exp, env);
     if (isLambda(exp))
         return makeProcedure(lambdaParameters(exp), lambdaBody(exp), env);
+    if (isBegin(exp))
+        return evalSequence(beginActions(exp), env);
+    if (isCond(exp))
+        return eval(condToIf(exp), env);
     if (isApplication(exp))
         return apply(eval(operator(exp), env), listOfValues(operands(exp), env));
-    throw new Error('ERROR: Unknown expression in EVAL - ' + exp);
+    throw new Error('ERROR: Unknown expression in EVAL - ' + outputExp(exp));
 }
 
 function apply(procedure, arguments) {
@@ -46,14 +63,22 @@ function evalSequence(exps, env) {
 function isTrue(exp) { return exp != false; }
 function isFalse(exp) { return exp == false; }
 function isIf(exp) { return isTaggedList(exp, 'if'); }
-function ifPredicate(exp) { return exp[1]; }
-function ifConsequent(exp) { return exp[2]; }
-
+function ifPredicate(exp) { 
+    if (exp[1])
+        return exp[1];
+    throw new Error('ERROR: PREDICATE missing in IF - ' + outputExp(exp));
+}
+function ifConsequent(exp) { 
+    if (exp[2])
+        return exp[2];
+    throw new Error('ERROR: CONSEQUENT missing in IF - ' + outputExp(exp));
+ }
 function ifAlternative(exp) { 
     if (exp[3])
         return exp[3];
     return 'false'; 
 }
+function makeIf(predicate, consequent, alternative) { return ['if', predicate, consequent, alternative ]; }
 
 function evalIf(exp, env) {
     const predicate = eval(ifPredicate(exp), env);
@@ -66,8 +91,16 @@ function evalIf(exp, env) {
 function isAssignment(exp) {
     return isTaggedList(exp, 'set!');
 }
-function assignmentVariable(exp) { return exp[1]; }
-function assignmentValue(exp) { return exp[2]; }
+function assignmentVariable(exp) { 
+    if (exp[1])
+        return exp[1];
+    throw new Error('ERROR: VARIABLE NAME missing in SET! - ' + outputExp(exp));
+}
+function assignmentValue(exp) { 
+    if (exp[2])
+        return exp[2];
+    throw new Error('ERROR: VALUE missing in SET! - ' + outputExp(exp));
+}
 
 function evalAssignment(exp, env) {
     const value = eval(assignmentValue(exp), env);
@@ -81,15 +114,23 @@ function isDefinition(exp) {
 }
 
 function definitionVariable(exp) {
-    if (typeof exp[1] == 'string')
-        return exp[1];
-    return exp[1][0];
+    let variable;
+    if (Array.isArray(exp[1]))
+        variable = exp[1][0];
+    else 
+        variable = exp[1];
+    if (variable)
+        return variable;
+    throw new Error('ERROR: VARIABLE NAME missing in DEFINE - ' + outputExp(exp));
 }
 
 function definitionValue(exp) {
-    if (!Array.isArray(exp[1]))
-        return exp[2];
-    return makeLambda(exp[1].slice(1), exp[2]); // parameters and body
+    if (!Array.isArray(exp[1])) {
+        if (exp[2])
+            return exp[2];
+        throw new Error('ERROR: VALUE missing in DEFINE - ' + outputExp(exp));
+    }
+    return makeLambda(exp[1].slice(1), exp.slice(2)); // parameters and body
 }
 
 function evalDefinition(exp, env) {
@@ -126,19 +167,80 @@ function isQuoted(exp) {
 function textOfQuotation(exp) { return exp[1]; }
 
 // begin
+function isBegin(exp) { return isTaggedList(exp, 'begin'); }
+function beginActions(exp) { return exp.slice(1); }
+function makeBegin(seq) { 
+    const arr = ['begin'];
+    for (let i = 0; i < seq.length; i++)
+        arr.push(seq[i]);
+    return arr;
+}
 
+// cond
+function isCond(exp) { return isTaggedList(exp, 'cond'); }
+function condClauses(exp) { return exp.slice(1); }
+function condPredicate(clause) { 
+    if (clause[0]) 
+        return clause[0];
+    throw new Error('ERROR: PREDICATE missing in COND->IF - ' + outputExp(clause));
+}
+function condActions(clause) { 
+    const actions = clause.slice(1);
+    if (actions.length > 0)
+        return actions;
+    throw new Error('ERROR: ACTION missing in COND->IF - ' + outputExp(clause));
+}
+function isCondElseClause(clause) { return condPredicate(clause) == 'else'; }
+function condToIf(exp) { return expandClauses(condClauses(exp)); }
+
+function sequenceToExp(seq) {
+    if (isLastExp(seq))
+        return firstExp(seq);
+    return makeBegin(seq);
+}
+
+function expandClauses(clauses) {
+    if (clauses.length == 0)
+        return 'false';
+    const first = clauses[0];
+    const rest = clauses.slice(1);
+    if (isCondElseClause(first)) {
+        if (rest.length == 0) 
+            return sequenceToExp(condActions(first));
+        throw new Error('ERROR: ELSE clause isn\'t last in COND->IF - ' + outputExp(first));
+    }
+    return makeIf(condPredicate(first), sequenceToExp(condActions(first)), expandClauses(rest));
+}
 
 // lambda expressions
 function isLambda(exp) { return isTaggedList(exp, 'lambda'); }
-function lambdaParameters(exp) { return exp[1]; }
-function lambdaBody(exp) { return exp.slice(2); }
-function makeLambda(parameters, body) { return ['lambda', parameters, body]; }
+function lambdaParameters(exp) { 
+    if (exp[1])
+        return exp[1];
+    throw new Error('ERROR: PARAMETERS missing in LAMBDA - ' + outputExp(exp));
+}
+function lambdaBody(exp) { 
+    let body = exp.slice(2);
+    if (body.length > 0)
+        return body;
+    throw new Error('ERROR: BODY missing in LAMBDA - ' + outputExp(exp));
+}
+function makeLambda(parameters, body) { 
+    const arr = ['lambda', parameters];
+    for (let i = 0; i < body.length; i++)
+        arr.push(body[i]);
+    return arr;
+}
 
 // application
 function isApplication(exp) { 
     return Array.isArray(exp);
 }
-function operator(exp) { return exp[0]; }
+function operator(exp) { 
+    if (exp[0]) 
+        return exp[0];
+    throw new Error('ERROR: OPERATOR missing in APPLY - ' + outputExp(exp));
+}
 function operands(exp) { return exp.slice(1); }
 
 function makeProcedure(parameters, body, env) {
@@ -146,7 +248,7 @@ function makeProcedure(parameters, body, env) {
 }
 function isCompoundProcedure(p) { 
     return isTaggedList(p, 'procedure');
- }
+}
 
 function procedureParameters(p) { return p[1]; }
 function procedureBody(p) { return p[2]; }
@@ -169,12 +271,11 @@ function extendEnvironment(vars, vals, baseEnv) {
     if (vars.length == vals.length)
         return [makeFrame(vars, vals), baseEnv];
     if (vars.length < vals.length)
-        throw Error('ERROR: Too many arguments supplied - ', + vars + vals);
+        throw Error('ERROR: Too many arguments supplied - ' + outputExp(vars) + ' ' + outputExp(vals));
     else 
-        throw Error('ERROR: Too few arguments supplied - ', + vars + vals);
+        throw Error('ERROR: Too few arguments supplied - ' + outputExp(vars) + ' ' + outputExp(vals));
 }
 
-function empty(arr) { return arr.length == 0; }
 function lookupVariableValue(variable, env) {
     while (env != theEmptyEnvironment) {
         const vars = frameVariables(firstFrame(env));

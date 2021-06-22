@@ -8,7 +8,7 @@ function tokenize(input) {
             if (stack.length > 0)  
                 stack.pop();
             else 
-                throw new Error('Error: Invalid )');
+                throw new Error('ERROR: Invalid )');
         }  
         else if (result[i] == '') { // remove empty strings
             result.splice(i, 1);
@@ -16,7 +16,7 @@ function tokenize(input) {
         }
     }
     if (stack.length > 0)
-        throw new Error('Error: Was expecting a )');
+        throw new Error('ERROR: Was expecting a )');
     return result;
 }
 

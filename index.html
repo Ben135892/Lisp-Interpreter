@@ -24,8 +24,18 @@
 
     button.onclick = (e => {
         output.style.color = 'green';
+        if (input.value == '') {
+            output.innerText = '';
+            return;
+        }
         try {
-            output.innerText = evalSequence(parenthesize(tokenize(input.value)), globalEnv);
+            const evaluated = evalSequence(parenthesize(tokenize(input.value)), globalEnv);
+            console.log(evaluated);
+            if (isCompoundProcedure(evaluated) || isPrimitiveProcedure(evaluated)) {
+                output.innerText = '<procedure>';
+                return;
+            }
+            output.innerText = evaluated;
         }
         catch(error) {
             output.innerText = error.message;
