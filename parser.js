@@ -24,8 +24,7 @@ function readFromTokens(tokens) {
     const token = tokens.shift();
     if (token == '(') {
         const list = []; 
-        while (tokens[0] != ')')
-        {
+        while (tokens[0] != ')') {
             list.push(readFromTokens(tokens));
         }
         tokens.shift();
