@@ -30,12 +30,14 @@
         }
         try {
             const evaluated = evalSequence(parenthesize(tokenize(input.value)), globalEnv);
-            console.log(evaluated);
             if (isCompoundProcedure(evaluated) || isPrimitiveProcedure(evaluated)) {
                 output.innerText = '<procedure>';
                 return;
             }
-            output.innerText = evaluated;
+            if (Array.isArray(evaluated))
+                output.innerText = outputExp(evaluated);
+            else
+                output.innerText = evaluated;
         }
         catch(error) {
             output.innerText = error.message;

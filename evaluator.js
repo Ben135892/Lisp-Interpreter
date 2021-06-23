@@ -3,12 +3,11 @@ function outputExp(exp) {
         return exp;
     let output = '(';
     for (let i = 0; i < exp.length; i++) {
-        output += outputExp(exp[i]) + ' ';
+        output += outputExp(exp[i])
+        if (i < exp.length - 1)
+            output += ' ';
     }
-    if (exp.length > 0)
-        output = output.slice(0, -1);
-    output += ')';
-    return output;
+    return output + ')';
 }
 
 function eval(exp, env) {
@@ -30,9 +29,11 @@ function eval(exp, env) {
         return evalSequence(beginActions(exp), env);
     if (isCond(exp))
         return eval(condToIf(exp), env);
+    if (isLet(exp)) 
+        return eval(letToApplication(exp), env);
     if (isApplication(exp))
         return apply(eval(operator(exp), env), listOfValues(operands(exp), env));
-    throw new Error('ERROR: Unknown expression in EVAL - ' + outputExp(exp));
+    throw new Error('ERROR: Unknown expression in EVAL - ' + exp);
 }
 
 function apply(procedure, arguments) {
@@ -114,28 +115,30 @@ function isDefinition(exp) {
 }
 
 function definitionVariable(exp) {
-    let variable;
+    let variable = exp[1];
     if (Array.isArray(exp[1]))
         variable = exp[1][0];
-    else 
-        variable = exp[1];
     if (variable != undefined)
         return variable;
     throw new Error('ERROR: VARIABLE NAME missing in DEFINE - ' + outputExp(exp));
 }
 
 function definitionValue(exp) {
-    if (!Array.isArray(exp[1])) {
-        if (exp[2] != undefined)
-            return exp[2];
-        throw new Error('ERROR: VALUE missing in DEFINE - ' + outputExp(exp));
+    if (Array.isArray(exp[1])) {
+        const body = exp.slice(2);
+        if (body.length > 0)
+            return makeLambda(exp[1].slice(1), exp.slice(2)); // parameters and body
+        throw new Error('ERROR: BODY missing in DEFINE - ' + outputExp(exp));
     }
-    return makeLambda(exp[1].slice(1), exp.slice(2)); // parameters and body
+    if (exp[2] != undefined)
+        return exp[2];
+    throw new Error('ERROR: VALUE missing in DEFINE - ' + outputExp(exp));
 }
 
 function evalDefinition(exp, env) {
+    const variable = definitionVariable(exp);
     const value = eval(definitionValue(exp), env);
-    defineVariable(definitionVariable(exp), value, env);
+    defineVariable(variable, value, env);
     return 'ok';
 }
 
@@ -161,6 +164,7 @@ function isTaggedList(exp, tag) {
     return Array.isArray(exp) && exp[0] == tag;
 }
 
+// quotation
 function isQuoted(exp) {
     return isTaggedList(exp, 'quote');
 }
@@ -171,12 +175,10 @@ function isBegin(exp) { return isTaggedList(exp, 'begin'); }
 function beginActions(exp) { return exp.slice(1); }
 function makeBegin(seq) { 
     const arr = ['begin'];
-    for (let i = 0; i < seq.length; i++)
-        arr.push(seq[i]);
-    return arr;
+    return arr.concat(seq);
 }
 
-// cond
+// cond, syntatic sugar for if expression
 function isCond(exp) { return isTaggedList(exp, 'cond'); }
 function condClauses(exp) { return exp.slice(1); }
 function condPredicate(clause) { 
@@ -204,7 +206,7 @@ function expandClauses(clauses) {
         return 'false';
     const first = clauses[0];
     const rest = clauses.slice(1);
-    if (isCondElseClause(first)) {
+    if (isCondElseClause(first)) { // if else clause
         if (rest.length == 0) 
             return sequenceToExp(condActions(first));
         throw new Error('ERROR: ELSE clause isn\'t last in COND->IF - ' + outputExp(first));
@@ -220,16 +222,52 @@ function lambdaParameters(exp) {
     throw new Error('ERROR: PARAMETERS missing in LAMBDA - ' + outputExp(exp));
 }
 function lambdaBody(exp) { 
-    let body = exp.slice(2);
+    const body = exp.slice(2);
     if (body.length > 0)
         return body;
     throw new Error('ERROR: BODY missing in LAMBDA - ' + outputExp(exp));
 }
 function makeLambda(parameters, body) { 
     const arr = ['lambda', parameters];
-    for (let i = 0; i < body.length; i++)
-        arr.push(body[i]);
-    return arr;
+    return arr.concat(body);
+}
+
+// let expressions, syntatic sugar for application with lambda expression as operator
+function isLet(exp) { return isTaggedList(exp, 'let'); }
+function letBindings(exp) {
+    if (exp[1] != undefined)
+        return exp[1];
+    throw new Error('ERROR: BINDINGS missing in LET - ' + outputExp(exp));
+}
+function letBody(exp) {
+    const body = exp.slice(2);
+    if (body.length > 0)
+        return body;
+    throw new Error('ERROR: BODY missing in LET - ' + outputExp(exp));
+}
+function letParameter(binding) {
+    if (!Array.isArray(binding))
+        throw new Error('ERROR: BINDING should be a pair in LET - ' + outputExp(binding));
+    if (binding[0] != undefined)
+        return binding[0];
+    throw new Error('ERROR: PARAMETER missing in LET - ' + outputExp(binding));
+}
+function letArgument(binding) {
+    if (binding[1] != undefined)
+        return binding[1];
+    throw new Error('ERROR: ARGUMENT missing in LET - ' + outputExp(binding));
+}
+function letToApplication(exp) {
+    const params = [];
+    const args = [];
+    const bindings = letBindings(exp);
+    for (let i = 0; i < bindings.length; i++) {
+        params.push(letParameter(bindings[i]));
+        args.push(letArgument(bindings[i]));
+    }
+    const application = []; // operator (lambda expression) and arguments
+    application.push(makeLambda(params, letBody(exp)));
+    return application.concat(args);
 }
 
 // application
@@ -243,6 +281,7 @@ function operator(exp) {
 }
 function operands(exp) { return exp.slice(1); }
 
+// procedures
 function makeProcedure(parameters, body, env) {
     return ['procedure', parameters, body, env];
 }
@@ -327,12 +366,65 @@ function setupEnvironment() {
 function isPrimitiveProcedure(proc) { return isTaggedList(proc, 'primitive'); }
 function primitiveImplementation(proc) { return proc[1]; }
 
+function add(args) {
+    return args.reduce((a, b) => {
+        if (typeof a == 'number' && typeof b == 'number')
+            return a + b;
+        throw new Error('ERROR: not all arguments are numbers - ' + outputExp(args));
+    }, 0);
+}
+
+function multiply(args) {
+    return args.reduce((a, b) => {
+        if (typeof a == 'number' && typeof b == 'number')
+            return a * b;
+        throw new Error('ERROR: not all arguments are numbers - ' + outputExp(args));
+    }, 1);
+}
+
+function subtract(args) {
+    if (args.length == 0)
+        throw new Error('ERROR: no arguments given in -');
+    return args.reduce((a, b) => {
+        if (typeof a == 'number' && typeof b == 'number')
+            return a - b;
+        throw new Error('ERROR: not all arguments are numbers - ' + outputExp(args));
+    }, 2 * args[0]);
+}
+
+function divide(args) {
+    if (args.length == 0)
+        throw new Error('ERROR: no arguments given in /');
+    return args.reduce((a, b) => {
+        if (typeof a == 'number' && typeof b == 'number')
+            return a / b;
+        throw new Error('ERROR: not all arguments are numbers - ' + outputExp(args));
+    }, args[0] * args[0]);
+}
+
+function equal(args) {
+    if (args.length == 0)
+        throw new Error('ERROR: no arguments given in =');
+    for (let i = 0; i < args.length - 1; i++) {
+        if (args[i] !== args[i + 1]) // type check, "2" and 2 shouldn't be equal
+            return false; 
+    }
+    return true;
+}
+
+function cons(args) {
+    if (args.length != 2) 
+        throw new Error('ERROR: 2 arguments should be given in cons - ' + outputExp(args));
+    return [args[0], args[1]];
+}
+
 const primitiveProcedures = [
-    ['+', (args) => args[0] + args[1]],
-    ['*', (args) => args[0] * args[1]],
-    ['-', (args) => args[0] - args[1]],
-    ['/', (args) => args[0] / args[1]],
-    ['=', (args) => args[0] == args[1]],
+    ['+', (args) => add(args)],
+    ['*', (args) => multiply(args)],
+    ['-', (args) => subtract(args)],
+    ['/', (args) => divide(args)],
+    ['=', (args) => equal(args)],
+    ['cons', (args) => cons(args)]
 ];
 
 function primitiveProcedureNames() { return primitiveProcedures.map(x => x[0]); }
