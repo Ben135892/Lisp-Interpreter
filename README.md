@@ -9,13 +9,12 @@ Example input code:
 (define x 5)
 (factorial x)
 ```
-which will will output 120.
-Can also write code to recursivly calculate the nth fibonacci number like so:
+which outputs 120.
+Another example, to calculate the nth fibonacci number:
 ```
 (define (fib n) 
 (cond ((= n 0) 0)
       ((= n 1) 1)
       (else (+ (fib (- n 1)) (fib (- n 2))))))
-
 (fib 8)
 ```
