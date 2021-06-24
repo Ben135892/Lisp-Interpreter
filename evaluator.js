@@ -1,9 +1,12 @@
 function outputExp(exp) {
+    if (isCompoundProcedure(exp) || isPrimitiveProcedure(exp)) {
+        return '<procedure>';
+    }
     if (!Array.isArray(exp))
         return exp;
     let output = '(';
     for (let i = 0; i < exp.length; i++) {
-        output += outputExp(exp[i])
+        output += outputExp(exp[i]);
         if (i < exp.length - 1)
             output += ' ';
     }
@@ -12,7 +15,7 @@ function outputExp(exp) {
 
 function eval(exp, env) {
     if (isSelfEvaluating(exp))
-        return value(exp);
+        return exp;
     if (isVariable(exp))
         return lookupVariableValue(exp, env);
     if (isQuoted(exp))
@@ -31,6 +34,8 @@ function eval(exp, env) {
         return eval(condToIf(exp), env);
     if (isLet(exp)) 
         return eval(letToApplication(exp), env);
+    if (isError(exp))
+        throw new Error(errorMessage(exp, env));
     if (isApplication(exp))
         return apply(eval(operator(exp), env), listOfValues(operands(exp), env));
     throw new Error('ERROR: Unknown expression in EVAL - ' + exp);
@@ -39,7 +44,7 @@ function eval(exp, env) {
 function apply(procedure, arguments) {
     if (isPrimitiveProcedure(procedure)) 
         return applyPrimitiveProcedure(procedure, arguments);
-    else if (isCompoundProcedure(procedure)) {
+    if (isCompoundProcedure(procedure)) {
         const newEnv = extendEnvironment(procedureParameters(procedure), arguments, procedureEnvironment(procedure));
         return evalSequence(procedureBody(procedure), newEnv);
     }
@@ -106,7 +111,7 @@ function assignmentValue(exp) {
 function evalAssignment(exp, env) {
     const value = eval(assignmentValue(exp), env);
     setVariableValue(assignmentVariable(exp), value, env);
-    return 'ok';
+    return '"ok"';
 }
 
 //definition
@@ -139,20 +144,14 @@ function evalDefinition(exp, env) {
     const variable = definitionVariable(exp);
     const value = eval(definitionValue(exp), env);
     defineVariable(variable, value, env);
-    return 'ok';
+    return '"ok"';
 }
 
 // self evaluating
 function isNumber(exp) { return typeof exp == 'number'; }
-function isString(exp) { return typeof exp == 'string' && exp[0] == '"' && exp.slice(-1) == '"'; }
+function isString(exp) { return typeof exp == 'string' && exp.length >= 2 && exp[0] == '"' && exp.slice(-1) == '"'; }
 function isSelfEvaluating(exp) {
-    return isNumber(exp) || isString(exp);
-}
-
-function value(exp) {
-    if (isString(exp))
-        return exp.slice(1, -1);
-    return exp;
+    return isNumber(exp) || isString(exp) || exp == 'nil';
 }
 
 //variables
@@ -270,6 +269,19 @@ function letToApplication(exp) {
     return application.concat(args);
 }
 
+//errors
+function isError(exp) {
+    return isTaggedList(exp, 'error');
+}
+function errorMessage(exp, env) {
+    const message = exp.slice(1);
+    if (message.length > 0) {
+        const messageValues = listOfValues(message, env);
+        return 'ERROR: ' + messageValues.join(' ');
+    }
+    return 'ERROR';
+}
+
 // application
 function isApplication(exp) { 
     return Array.isArray(exp);
@@ -289,7 +301,7 @@ function isCompoundProcedure(p) {
     return isTaggedList(p, 'procedure');
 }
 
-function procedureParameters(p) { return p[1]; }
+function procedureParameters(p) { return p[1].slice(); } // copy array so that parameters of procedure will remain constant
 function procedureBody(p) { return p[2]; }
 function procedureEnvironment(p) { return p[3]; }
 
@@ -412,10 +424,33 @@ function equal(args) {
     return true;
 }
 
-function cons(args) {
-    if (args.length != 2) 
-        throw new Error('ERROR: 2 arguments should be given in cons - ' + outputExp(args));
-    return [args[0], args[1]];
+function checkArgsInequality(procedureName, args) {
+    if (args.length != 2)
+        throw new Error('ERROR: two arguments must be given in ' + procedureName);
+    if (!(typeof args[0] == 'number' && typeof args[1] == 'number'))
+        throw new Error('ERROR: not all arguments are numbers - ' + outputExp(args));
+}
+function greaterThanOrEqual(args) {
+    checkArgsInequality('>=', args);
+    return args[0] >= args[1];
+}
+function lessThanOrEqual(args) {
+    checkArgsInequality('<', args);
+    return args[0] <= args[1];
+}
+function greaterThan(args) {
+    checkArgsInequality('>', args);
+    return args[0] > args[1];
+}
+function lessThan(args) {
+    checkArgsInequality('<', args);
+    return args[0] < args[1];
+}
+
+function isNull(args) {
+    if (args.length != 1)
+        throw new Error('ERROR: 1 argument must be given in null? - ' + outputExp(args));
+    return args[0] == 'nil';
 }
 
 const primitiveProcedures = [
@@ -424,7 +459,11 @@ const primitiveProcedures = [
     ['-', (args) => subtract(args)],
     ['/', (args) => divide(args)],
     ['=', (args) => equal(args)],
-    ['cons', (args) => cons(args)]
+    ['>=', (args) => greaterThanOrEqual(args)],
+    ['<=', (args) => lessThanOrEqual(args)],
+    ['>', (args) => greaterThan(args)],
+    ['<', (args) => lessThan(args)],
+    ['null?', (args) => isNull(args)]
 ];
 
 function primitiveProcedureNames() { return primitiveProcedures.map(x => x[0]); }

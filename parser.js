@@ -1,5 +1,5 @@
 function tokenize(input) {
-    let result = input.replaceAll('(', ' ( ').replaceAll(')', ' ) ').replaceAll('\n', '').trim().split(' ');
+    let result = input.replaceAll('(', ' ( ').replaceAll(')', ' ) ').replaceAll('\n', ' ').trim().split(' ');
     const stack = [];
     for (let i = 0; i < result.length; i++) {
         if (result[i] == '(')

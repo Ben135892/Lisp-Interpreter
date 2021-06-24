@@ -23,25 +23,18 @@
     const output = document.getElementById('output');
 
     button.onclick = (e => {
-        output.style.color = 'green';
         if (input.value == '') {
             output.innerText = '';
             return;
         }
         try {
             const evaluated = evalSequence(parenthesize(tokenize(input.value)), globalEnv);
-            if (isCompoundProcedure(evaluated) || isPrimitiveProcedure(evaluated)) {
-                output.innerText = '<procedure>';
-                return;
-            }
-            if (Array.isArray(evaluated))
-                output.innerText = outputExp(evaluated);
-            else
-                output.innerText = evaluated;
+            output.style.color = 'green';
+            output.innerText = outputExp(evaluated);
         }
         catch(error) {
-            output.innerText = error.message;
             output.style.color = 'red';
+            output.innerText = error.message;
         }
     });
 </script>
