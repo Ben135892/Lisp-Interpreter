@@ -1,3 +1,4 @@
+// tokenize a string, e.g "(define x (+ 5 1))" => ["define", "x", "(", "+", "5", "1", ")", ")"]
 function tokenize(input) {
     let result = input.replaceAll('(', ' ( ').replaceAll(')', ' ) ').replaceAll('\n', ' ').trim().split(' ');
     const stack = [];
@@ -20,6 +21,7 @@ function tokenize(input) {
     return result;
 }
 
+// reads from a tokenized expression, e.g ["(", "+", "5", "1", ")"] => ["+", 5, 1]
 function readFromTokens(tokens) {
     const token = tokens.shift();
     if (token == '(') {
@@ -35,6 +37,7 @@ function readFromTokens(tokens) {
     return token;
 }
 
+// reads from multiple tokenized expressions
 function parenthesize(tokens) {
     const result = [];
     while (tokens.length > 0) 

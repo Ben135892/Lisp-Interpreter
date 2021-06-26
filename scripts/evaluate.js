@@ -1,25 +1,9 @@
-function outputExp(exp) {
-    if (isCompoundProcedure(exp) || isPrimitiveProcedure(exp)) {
-        return '<procedure>';
-    }
-    if (!Array.isArray(exp))
-        return exp;
-    let output = '(';
-    for (let i = 0; i < exp.length; i++) {
-        output += outputExp(exp[i]);
-        if (i < exp.length - 1)
-            output += ' ';
-    }
-    return output + ')';
-}
-
+// main evaluation function
 function eval(exp, env) {
     if (isSelfEvaluating(exp))
         return exp;
     if (isVariable(exp))
         return lookupVariableValue(exp, env);
-    if (isQuoted(exp))
-        return (textOfQuotation(exp));
     if (isAssignment(exp))
         return evalAssignment(exp, env);
     if (isDefinition(exp))
@@ -41,6 +25,7 @@ function eval(exp, env) {
     throw new Error('ERROR: Unknown expression in EVAL - ' + exp);
 }
 
+// apply arguments to procedure
 function apply(procedure, arguments) {
     if (isPrimitiveProcedure(procedure)) 
         return applyPrimitiveProcedure(procedure, arguments);
@@ -51,9 +36,7 @@ function apply(procedure, arguments) {
     throw new Error('ERROR: Unknown procedure type in APPLY - ' + procedure);
 }
 
-function listOfValues(exps, env) {
-    return exps.map(x => eval(x, env));
-}
+function listOfValues(exps, env) { return exps.map(x => eval(x, env)); }
 
 function firstExp(exps) { return exps[0]; }
 function isLastExp(exps) { return exps.length == 1; }
@@ -69,6 +52,7 @@ function evalSequence(exps, env) {
 function isTrue(exp) { return exp != false; }
 function isFalse(exp) { return exp == false; }
 function isIf(exp) { return isTaggedList(exp, 'if'); }
+
 function ifPredicate(exp) { 
     if (exp[1] != undefined)
         return exp[1];
@@ -79,11 +63,13 @@ function ifConsequent(exp) {
         return exp[2];
     throw new Error('ERROR: CONSEQUENT missing in IF - ' + outputExp(exp));
 }
+// return false for the if alternative if one doesn't exist
 function ifAlternative(exp) { 
     if (exp[3] != undefined)
         return exp[3];
     return 'false'; 
 }
+
 function makeIf(predicate, consequent, alternative) { return ['if', predicate, consequent, alternative]; }
 
 function evalIf(exp, env) {
@@ -94,9 +80,8 @@ function evalIf(exp, env) {
 }
 
 // assignment
-function isAssignment(exp) {
-    return isTaggedList(exp, 'set!');
-}
+function isAssignment(exp) { return isTaggedList(exp, 'set!'); }
+
 function assignmentVariable(exp) { 
     if (exp[1] != undefined)
         return exp[1];
@@ -108,6 +93,7 @@ function assignmentValue(exp) {
     throw new Error('ERROR: VALUE missing in SET! - ' + outputExp(exp));
 }
 
+// return the string "ok" as a result of assignment
 function evalAssignment(exp, env) {
     const value = eval(assignmentValue(exp), env);
     setVariableValue(assignmentVariable(exp), value, env);
@@ -115,9 +101,7 @@ function evalAssignment(exp, env) {
 }
 
 //definition
-function isDefinition(exp) {
-    return isTaggedList(exp, 'define');
-}
+function isDefinition(exp) { return isTaggedList(exp, 'define'); }
 
 function definitionVariable(exp) {
     let variable = exp[1];
@@ -150,24 +134,17 @@ function evalDefinition(exp, env) {
 // self evaluating
 function isNumber(exp) { return typeof exp == 'number'; }
 function isString(exp) { return typeof exp == 'string' && exp.length >= 2 && exp[0] == '"' && exp.slice(-1) == '"'; }
+
 function isSelfEvaluating(exp) {
     return isNumber(exp) || isString(exp) || exp == 'nil';
 }
 
 //variables
-function isVariable(exp) {
-    return typeof exp == 'string';
-}
+function isVariable(exp) { return typeof exp == 'string'; }
 
 function isTaggedList(exp, tag) {
     return Array.isArray(exp) && exp[0] == tag;
 }
-
-// quotation
-function isQuoted(exp) {
-    return isTaggedList(exp, 'quote');
-}
-function textOfQuotation(exp) { return exp[1]; }
 
 // begin
 function isBegin(exp) { return isTaggedList(exp, 'begin'); }
@@ -179,6 +156,7 @@ function makeBegin(seq) {
 
 // cond, syntatic sugar for if expression
 function isCond(exp) { return isTaggedList(exp, 'cond'); }
+
 function condClauses(exp) { return exp.slice(1); }
 function condPredicate(clause) { 
     if (clause[0] != undefined) 
@@ -191,9 +169,12 @@ function condActions(clause) {
         return actions;
     throw new Error('ERROR: ACTION missing in COND->IF - ' + outputExp(clause));
 }
+
 function isCondElseClause(clause) { return condPredicate(clause) == 'else'; }
+
 function condToIf(exp) { return expandClauses(condClauses(exp)); }
 
+// sequenceToExp used in condToIf
 function sequenceToExp(seq) {
     if (isLastExp(seq))
         return firstExp(seq);
@@ -215,6 +196,7 @@ function expandClauses(clauses) {
 
 // lambda expressions
 function isLambda(exp) { return isTaggedList(exp, 'lambda'); }
+
 function lambdaParameters(exp) { 
     if (exp[1] != undefined)
         return exp[1];
@@ -231,8 +213,9 @@ function makeLambda(parameters, body) {
     return arr.concat(body);
 }
 
-// let expressions, syntatic sugar for application with lambda expression as operator
+// let expressions, syntatic sugar for application with lambda expression as operator with given arguments in bindings
 function isLet(exp) { return isTaggedList(exp, 'let'); }
+
 function letBindings(exp) {
     if (exp[1] != undefined)
         return exp[1];
@@ -256,6 +239,7 @@ function letArgument(binding) {
         return binding[1];
     throw new Error('ERROR: ARGUMENT missing in LET - ' + outputExp(binding));
 }
+
 function letToApplication(exp) {
     const params = [];
     const args = [];
@@ -368,16 +352,7 @@ function defineVariable(variable, value, env) {
     addBindingToFrame(variable, value, frame);
 }
 
-function setupEnvironment() {
-    const initialEnv = extendEnvironment(primitiveProcedureNames(), primitiveProcedureObjects(), theEmptyEnvironment);
-    defineVariable('false', false, initialEnv);
-    defineVariable('true', true, initialEnv);
-    return initialEnv;
-}
-
-function isPrimitiveProcedure(proc) { return isTaggedList(proc, 'primitive'); }
-function primitiveImplementation(proc) { return proc[1]; }
-
+// primitive procedures
 function add(args) {
     return args.reduce((a, b) => {
         if (typeof a == 'number' && typeof b == 'number')
@@ -424,12 +399,14 @@ function equal(args) {
     return true;
 }
 
+// checkArgsInequality used by primitive inequality operations
 function checkArgsInequality(procedureName, args) {
     if (args.length != 2)
         throw new Error('ERROR: two arguments must be given in ' + procedureName);
     if (!(typeof args[0] == 'number' && typeof args[1] == 'number'))
         throw new Error('ERROR: not all arguments are numbers - ' + outputExp(args));
 }
+
 function greaterThanOrEqual(args) {
     checkArgsInequality('>=', args);
     return args[0] >= args[1];
@@ -466,8 +443,16 @@ const primitiveProcedures = [
     ['null?', (args) => isNull(args)]
 ];
 
+function isPrimitiveProcedure(proc) { return isTaggedList(proc, 'primitive'); }
+function primitiveImplementation(proc) { return proc[1]; }
+
 function primitiveProcedureNames() { return primitiveProcedures.map(x => x[0]); }
 function primitiveProcedureObjects() { return primitiveProcedures.map(x => ['primitive', x[1]]); }
 function applyPrimitiveProcedure(proc, args) { return primitiveImplementation(proc)(args); }
 
-const globalEnv = setupEnvironment();
+function setupEnvironment() {
+    const initialEnv = extendEnvironment(primitiveProcedureNames(), primitiveProcedureObjects(), theEmptyEnvironment);
+    defineVariable('false', false, initialEnv);
+    defineVariable('true', true, initialEnv);
+    return initialEnv;
+}

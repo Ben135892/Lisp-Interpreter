@@ -11,32 +11,13 @@
     <div>
         <h1>LISP Interpreter</h1>
         <textarea rows="20" cols="50" id="input"></textarea>
-        <button id="button">Evaluate</button>
+        <button id="evaluate">Evaluate</button>
         <h1 id="output"></h1>
     </div>
 </body>
-<script src="evaluator.js"></script>
-<script src="parser.js"></script>
-<script>
-    const input = document.getElementById('input');
-    const button = document.getElementById('button');
-    const output = document.getElementById('output');
-
-    button.onclick = (e => {
-        if (input.value == '') {
-            output.innerText = '';
-            return;
-        }
-        try {
-            const evaluated = evalSequence(parenthesize(tokenize(input.value)), globalEnv);
-            output.style.color = 'green';
-            output.innerText = outputExp(evaluated);
-        }
-        catch(error) {
-            output.style.color = 'red';
-            output.innerText = error.message;
-        }
-    });
-</script>
+<script src="scripts/outputExp.js"></script>
+<script src="scripts/parse.js"></script>
+<script src="scripts/evaluate.js"></script>
+<script src="scripts/main.js"></script>
 
 </html>
