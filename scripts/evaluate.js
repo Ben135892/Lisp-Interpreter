@@ -4,6 +4,8 @@ function eval(exp, env) {
         return exp;
     if (isVariable(exp))
         return lookupVariableValue(exp, env);
+    if (isQuote(exp))
+        return textOfQuotation(exp);
     if (isAssignment(exp))
         return evalAssignment(exp, env);
     if (isDefinition(exp))
@@ -144,6 +146,14 @@ function isVariable(exp) { return typeof exp == 'string'; }
 
 function isTaggedList(exp, tag) {
     return Array.isArray(exp) && exp[0] == tag;
+}
+
+// quotations
+function isQuote(exp) { return isTaggedList(exp, 'quote'); }
+function textOfQuotation(exp) {
+    if (exp[1] != undefined)
+        return exp[1];
+    throw new Error('ERROR: TEXT missing in QUOTE - ' + outputExp(exp));
 }
 
 // begin
